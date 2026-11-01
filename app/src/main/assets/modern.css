@@ -1,0 +1,262 @@
+/* Page setup, approximate to Microsoft Word “Normal” template */
+@page {
+    size: A4;
+    margin: 2.54cm;              /* 1 inch on all sides */
+}
+
+body {
+    font-family: "Calibri", "Helvetica", "Arial", sans-serif;
+    font-size: 11pt;
+    line-height: 1.15;
+    color: #000000;
+    margin: 0;
+    padding: 0;
+}
+
+/* Paragraphs and basic text flow */
+
+p {
+    margin-top: 0;
+    margin-bottom: 8pt;
+    text-align: left;
+}
+
+p + p {
+    /* visually closer inter-paragraph spacing, similar to Word */
+    margin-top: 0;
+}
+
+/* Optional: justify body text instead of left-align */
+/*
+p {
+    text-align: justify;
+}
+*/
+
+strong, b {
+    font-weight: bold;
+}
+
+em, i {
+    font-style: italic;
+}
+
+u {
+    text-decoration: underline;
+}
+
+/* Headings: roughly mimic Word’s default Calibri-based heading hierarchy */
+
+h1, h2, h3, h4, h5, h6 {
+    font-family: "Calibri", "Helvetica", "Arial", sans-serif;
+    font-weight: bold;
+    color: #2F5496;              /* Word’s bluish default for headings */
+    margin-top: 18pt;
+    margin-bottom: 6pt;
+    page-break-after: avoid;
+}
+
+h1 {
+    font-size: 16pt;
+    border-bottom: 1px solid #D9D9D9;
+    padding-bottom: 3pt;
+}
+
+h2 {
+    font-size: 14pt;
+}
+
+h3 {
+    font-size: 13pt;
+}
+
+h4 {
+    font-size: 12pt;
+    font-style: italic;
+}
+
+h5 {
+    font-size: 11pt;
+    font-style: italic;
+}
+
+h6 {
+    font-size: 11pt;
+    font-weight: normal;
+    font-style: italic;
+}
+
+/* Title block for pandoc-generated HTML */
+
+.title {
+    font-family: "Calibri", "Helvetica", "Arial", sans-serif;
+    font-size: 20pt;
+    font-weight: bold;
+    color: #2F5496;
+    text-align: center;
+    margin-top: 0;
+    margin-bottom: 6pt;
+}
+
+.subtitle {
+    font-family: "Calibri", "Helvetica", "Arial", sans-serif;
+    font-size: 14pt;
+    font-style: italic;
+    text-align: center;
+    margin-top: 0;
+    margin-bottom: 12pt;
+}
+
+.author, .date {
+    font-family: "Calibri", "Helvetica", "Arial", sans-serif;
+    font-size: 11pt;
+    text-align: center;
+    margin: 0;
+}
+
+/* Lists, approximating Word’s spacing and indentation */
+
+ul, ol {
+    margin-top: 0;
+    margin-bottom: 8pt;
+    padding-left: 36pt;          /* Word-like list indentation */
+}
+
+li {
+    margin-bottom: 2pt;
+}
+
+/* Tables in classic Word style (thin grid, light header shading) */
+
+table {
+    border-collapse: collapse;
+    width: 100%;
+    margin-top: 6pt;
+    margin-bottom: 12pt;
+    font-size: 11pt;
+}
+
+th, td {
+    border: 0.5pt solid #BFBFBF;
+    padding: 4pt 6pt;
+    vertical-align: top;
+}
+
+th {
+    background-color: #D9D9D9;
+    font-weight: bold;
+}
+
+/* Code, preformatted text and inline code */
+
+pre, code, kbd, samp {
+    font-family: "Consolas", "Courier New", monospace;
+    font-size: 10pt;
+}
+
+pre {
+    background-color: #F5F5F5;
+    border: 0.5pt solid #D9D9D9;
+    padding: 6pt;
+    margin-top: 0;
+    margin-bottom: 8pt;
+    white-space: pre-wrap;        /* better for narrow PDF columns */
+    word-wrap: break-word;
+}
+
+code {
+    background-color: #F5F5F5;
+    border-radius: 2px;
+    padding: 1px 3px;
+}
+
+/* Block quotes similar to Word’s indented quote style */
+
+blockquote {
+    margin: 6pt 24pt;
+    padding-left: 12pt;
+    border-left: 3px solid #D9D9D9;
+    font-style: italic;
+}
+
+/* Images: keep them within page margins */
+
+img {
+    max-width: 100%;
+    height: auto;
+}
+
+/* Horizontal rules */
+
+hr {
+    border: none;
+    border-top: 1px solid #BFBFBF;
+    margin-top: 12pt;
+    margin-bottom: 12pt;
+}
+
+/* Links styled in Word-like blue */
+
+a {
+    color: #0563C1;
+    text-decoration: underline;
+}
+
+/* Pandoc-specific structures: footnotes, TOC, etc. */
+
+.footnotes {
+    font-size: 9pt;
+    border-top: 0.5pt solid #BFBFBF;
+    margin-top: 12pt;
+    padding-top: 6pt;
+}
+
+.footnotes ol {
+    padding-left: 18pt;
+}
+
+.footnotes li {
+    margin-bottom: 4pt;
+}
+
+.toc, .toc ul, .toc ol {
+    list-style: none;
+    padding-left: 0;
+    margin-left: 0;
+    font-size: 11pt;
+}
+
+.toc a {
+    text-decoration: none;
+    color: #000000;
+}
+
+/* Page break helpers (can be triggered via classes in markdown) */
+
+.page-break {
+    page-break-before: always;
+}
+
+/* Small caps class, often used in Word templates */
+
+.smallcaps {
+    font-variant: small-caps;
+}
+
+/* Alignment helpers */
+
+.align-left {
+    text-align: left;
+}
+
+.align-right {
+    text-align: right;
+}
+
+.align-center {
+    text-align: center;
+}
+
+.align-justify {
+    text-align: justify;
+}
