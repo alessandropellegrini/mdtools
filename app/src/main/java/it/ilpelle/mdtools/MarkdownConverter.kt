@@ -1,4 +1,4 @@
-package it.ilpelle.mdpdf
+package it.ilpelle.mdtools
 
 import android.widget.Toast
 import com.vladsch.flexmark.ext.tables.TablesExtension

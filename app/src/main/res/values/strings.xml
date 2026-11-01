@@ -1,3 +1,20 @@
 <resources>
-    <string name="app_name">mdpdf</string>
+    <string name="app_name">mdtools</string>
+    <string name="tab_table_editor">Table Editor</string>
+    <string name="tab_pdf_converter">Markdown to PDF</string>
+    <string name="table_paste">Paste</string>
+    <string name="table_copy">Copy</string>
+    <string name="table_new">New</string>
+    <string name="table_view_code">Code</string>
+    <string name="add_row">+ Add Row</string>
+    <string name="add_column">+ Column</string>
+    <string name="create_table">Create Table</string>
+    <string name="cancel">Cancel</string>
+    <string name="rows_label">Rows</string>
+    <string name="cols_label">Columns</string>
+    <string name="import_markdown">Import Markdown Table</string>
+    <string name="import_btn">Import</string>
+    <string name="table_preview_title">Markdown Code</string>
+    <string name="copy_to_clipboard">Copy to Clipboard</string>
+    <string name="close">Close</string>
 </resources>

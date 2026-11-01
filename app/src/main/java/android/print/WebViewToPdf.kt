@@ -14,7 +14,7 @@ fun WebView.printToPdf(
     onFinished: () -> Unit,
     onError: (Throwable) -> Unit = {}
 ) {
-    val adapter = createPrintDocumentAdapter("mdpdf-job")
+    val adapter = createPrintDocumentAdapter("mdtools-job")
 
     val pdfUri = androidx.core.content.FileProvider.getUriForFile(
         context,

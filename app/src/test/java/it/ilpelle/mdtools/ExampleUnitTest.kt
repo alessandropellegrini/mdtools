@@ -1,4 +1,4 @@
-package it.ilpelle.mdpdf
+package it.ilpelle.mdtools
 
 import org.junit.Test
 

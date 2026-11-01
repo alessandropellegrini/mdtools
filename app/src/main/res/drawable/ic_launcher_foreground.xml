@@ -1,23 +1,74 @@
+<?xml version="1.0" encoding="utf-8"?>
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp"
     android:height="108dp"
-    android:viewportWidth="24"
-    android:viewportHeight="24"
-    android:tint="#000000">
-  <group android:scaleX="0.58"
-      android:scaleY="0.58"
-      android:translateX="5.04"
-      android:translateY="5.04">
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- Card outline & container -->
     <path
-        android:fillColor="@android:color/white"
-        android:pathData="M4,6H2v14c0,1.1 0.9,2 2,2h14v-2H4V6z"/>
+        android:fillColor="#26FFFFFF"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2.8"
+        android:strokeLineJoin="round"
+        android:pathData="M33,25 h42 a8,8 0 0,1 8,8 v42 a8,8 0 0,1 -8,8 h-42 a8,8 0 0,1 -8,-8 v-42 a8,8 0 0,1 8,-8 z" />
+
+    <!-- Markdown 'M' symbol -->
     <path
-        android:fillColor="@android:color/white"
-        android:pathData="M10,9h1v1h-1zM14,9h1v3h-1zM8,16h12L20,4L8,4v12zM17,8h2v1h-1v1h1v1h-1v2h-1L17,8zM13,8h2c0.55,0 1,0.45 1,1v3c0,0.55 -0.45,1 -1,1h-2L13,8zM9,8h2c0.55,0 1,0.45 1,1v1c0,0.55 -0.45,1 -1,1h-1v2L9,13L9,8z"
-        android:strokeAlpha="0.3"
-        android:fillAlpha="0.3"/>
+        android:fillColor="#FFFFFFFF"
+        android:pathData="M32,46 L32,32 L36.5,32 L41,38.5 L45.5,32 L50,32 L50,46 L46.5,46 L46.5,37 L42.5,42.5 L39.5,42.5 L35.5,37 L35.5,46 Z" />
+
+    <!-- Downward Arrow '↓' -->
     <path
-        android:fillColor="@android:color/white"
-        android:pathData="M20,2L8,2c-1.1,0 -2,0.9 -2,2v12c0,1.1 0.9,2 2,2h12c1.1,0 2,-0.9 2,-2L22,4c0,-1.1 -0.9,-2 -2,-2zM20,16L8,16L8,4h12v12zM16,12L16,9c0,-0.55 -0.45,-1 -1,-1h-2v5h2c0.55,0 1,-0.45 1,-1zM14,9h1v3h-1L14,9zM18,11h1v-1h-1L18,9h1L19,8h-2v5h1zM10,11h1c0.55,0 1,-0.45 1,-1L12,9c0,-0.55 -0.45,-1 -1,-1L9,8v5h1v-2zM10,9h1v1h-1L10,9z"/>
-  </group>
+        android:fillColor="#FF38BDF8"
+        android:pathData="M65,32 h4 v9 h-4 z" />
+    <path
+        android:fillColor="#FF38BDF8"
+        android:pathData="M61,40 L73,40 L67,47 Z" />
+
+    <!-- Horizontal Table Header divider -->
+    <path
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="2.5"
+        android:pathData="M25,51 L83,51" />
+
+    <!-- Horizontal Row 1/Row 2 divider -->
+    <path
+        android:strokeColor="#70FFFFFF"
+        android:strokeWidth="1.5"
+        android:pathData="M25,67 L83,67" />
+
+    <!-- Vertical Column 1 divider -->
+    <path
+        android:strokeColor="#70FFFFFF"
+        android:strokeWidth="1.5"
+        android:pathData="M44,51 L44,83" />
+
+    <!-- Vertical Column 2 divider -->
+    <path
+        android:strokeColor="#70FFFFFF"
+        android:strokeWidth="1.5"
+        android:pathData="M64,51 L64,83" />
+
+    <!-- Row 1 Data Cells (Pills) -->
+    <path
+        android:fillColor="#CCFFFFFF"
+        android:pathData="M31,56 h7 a2,2 0 0,1 2,2 v2 a2,2 0 0,1 -2,2 h-7 a2,2 0 0,1 -2,-2 v-2 a2,2 0 0,1 2,-2 z" />
+    <path
+        android:fillColor="#F038BDF8"
+        android:pathData="M50,56 h8 a2,2 0 0,1 2,2 v2 a2,2 0 0,1 -2,2 h-8 a2,2 0 0,1 -2,-2 v-2 a2,2 0 0,1 2,-2 z" />
+    <path
+        android:fillColor="#CCFFFFFF"
+        android:pathData="M70,56 h7 a2,2 0 0,1 2,2 v2 a2,2 0 0,1 -2,2 h-7 a2,2 0 0,1 -2,-2 v-2 a2,2 0 0,1 2,-2 z" />
+
+    <!-- Row 2 Data Cells (Pills) -->
+    <path
+        android:fillColor="#99FFFFFF"
+        android:pathData="M31,72 h5 a2,2 0 0,1 2,2 v2 a2,2 0 0,1 -2,2 h-5 a2,2 0 0,1 -2,-2 v-2 a2,2 0 0,1 2,-2 z" />
+    <path
+        android:fillColor="#99FFFFFF"
+        android:pathData="M50,72 h5 a2,2 0 0,1 2,2 v2 a2,2 0 0,1 -2,2 h-5 a2,2 0 0,1 -2,-2 v-2 a2,2 0 0,1 2,-2 z" />
+    <path
+        android:fillColor="#B038BDF8"
+        android:pathData="M70,72 h6 a2,2 0 0,1 2,2 v2 a2,2 0 0,1 -2,2 h-6 a2,2 0 0,1 -2,-2 v-2 a2,2 0 0,1 2,-2 z" />
 </vector>
