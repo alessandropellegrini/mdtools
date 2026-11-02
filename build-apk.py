@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """
 Single-command Android Fat APK Builder for mdtools using standard toolchain.
+Cross-platform (Linux, macOS, Windows) and fully self-contained.
 Invoked by Maven during 'mvn package' or run directly with:
     python3 build-apk.py
 """
@@ -13,6 +14,7 @@ import ssl
 import subprocess
 import sys
 import urllib.request
+import xml.etree.ElementTree as ET
 import zipfile
 
 DEPENDENCIES = [
@@ -88,9 +90,15 @@ DEPENDENCIES = [
     ('org.jetbrains.kotlinx', 'kotlinx-coroutines-core-jvm', '1.6.4', 'jar'),
 ]
 
+# Exact, deterministic dependencies for the standalone Kotlin compiler runner
 KOTLIN_COMPILER_DEPS = [
     ('org.jetbrains.kotlin', 'kotlin-compiler', '2.0.21', 'jar'),
     ('org.jetbrains.kotlin', 'kotlin-stdlib', '2.0.21', 'jar'),
+    ('org.jetbrains.kotlin', 'kotlin-script-runtime', '2.0.21', 'jar'),
+    ('org.jetbrains.kotlin', 'kotlin-reflect', '1.6.10', 'jar'),
+    ('org.jetbrains.intellij.deps', 'trove4j', '1.0.20200330', 'jar'),
+    ('org.jetbrains.kotlinx', 'kotlinx-coroutines-core-jvm', '1.6.4', 'jar'),
+    ('org.jetbrains', 'annotations', '24.0.1', 'jar'),
 ]
 
 TEST_DEPENDENCIES = [
@@ -99,35 +107,156 @@ TEST_DEPENDENCIES = [
 ]
 
 
-def find_android_sdk():
+def find_android_sdk(custom_path=None):
+    if custom_path and os.path.isdir(custom_path):
+        return os.path.abspath(custom_path)
+
+    # 1. Environment variables
+    for ev in ["ANDROID_HOME", "ANDROID_SDK_ROOT"]:
+        val = os.environ.get(ev)
+        if val and os.path.isdir(val):
+            return os.path.abspath(val)
+
+    # 2. Check if aapt2 or d8 is in PATH and infer SDK root
+    for tool in ["aapt2", "d8"]:
+        tool_path = shutil.which(tool)
+        if tool_path:
+            bt_dir = os.path.dirname(os.path.abspath(tool_path))
+            parent_dir = os.path.dirname(bt_dir)
+            if os.path.basename(parent_dir) == "build-tools":
+                sdk_candidate = os.path.dirname(parent_dir)
+                if os.path.isdir(os.path.join(sdk_candidate, "platforms")):
+                    return sdk_candidate
+
+    # 3. Standard platform candidate directories
     candidates = [
-        os.environ.get("ANDROID_HOME"),
-        os.environ.get("ANDROID_SDK_ROOT"),
-        "/opt/homebrew/share/android-commandlinetools",
+        # macOS
         os.path.expanduser("~/Library/Android/sdk"),
+        "/opt/homebrew/share/android-commandlinetools",
+        "/usr/local/share/android-commandlinetools",
         "/usr/local/share/android-sdk",
+        # Linux
         os.path.expanduser("~/Android/Sdk"),
+        "/usr/lib/android-sdk",
+        "/usr/local/android-sdk",
+        "/opt/android-sdk",
+        # Windows
+        os.path.expandvars(r"%LOCALAPPDATA%\Android\Sdk"),
+        os.path.expandvars(r"%ProgramFiles(x86)%\Android\android-sdk"),
     ]
     for c in candidates:
         if c and os.path.isdir(c):
-            return c
-    sys.exit("Error: Could not locate Android SDK. Set ANDROID_HOME or ANDROID_SDK_ROOT.")
+            return os.path.abspath(c)
+
+    sys.exit("Error: Could not locate Android SDK. Set ANDROID_HOME environment variable or pass --android-sdk.")
 
 
-def find_java():
-    candidates = [
-        os.environ.get("JAVA_HOME"),
+def get_java_major_version(java_bin):
+    try:
+        out = subprocess.check_output([java_bin, "-version"], stderr=subprocess.STDOUT, text=True)
+        for line in out.splitlines():
+            if "version" in line:
+                parts = line.split('"')
+                if len(parts) >= 2:
+                    v_str = parts[1]
+                    seg = v_str.split(".")[0]
+                    if seg == "1":
+                        return int(v_str.split(".")[1])
+                    return int(seg)
+    except Exception:
+        pass
+    return 0
+
+
+def find_java(custom_home=None):
+    is_win = sys.platform.startswith("win")
+    ext = ".exe" if is_win else ""
+
+    def check_jdk(jh):
+        if not jh or not os.path.isdir(jh):
+            return None
+        java = os.path.join(jh, "bin", f"java{ext}")
+        javac = os.path.join(jh, "bin", f"javac{ext}")
+        keytool = os.path.join(jh, "bin", f"keytool{ext}")
+        if os.path.isfile(java):
+            major = get_java_major_version(java)
+            return java, (javac if os.path.isfile(javac) else "javac"), (keytool if os.path.isfile(keytool) else "keytool"), major
+        return None
+
+    # 1. Custom home argument
+    if custom_home:
+        res = check_jdk(custom_home)
+        if res:
+            return res[0], res[1], res[2]
+        sys.exit(f"Error: Java not found in specified --java-home ({custom_home})")
+
+    candidates = []
+    # 2. JAVA_HOME environment variable
+    if os.environ.get("JAVA_HOME"):
+        candidates.append(os.environ.get("JAVA_HOME"))
+
+    # 3. Common platform directories
+    candidates.extend([
         "/opt/homebrew/opt/openjdk@17",
+        "/opt/homebrew/opt/openjdk@21",
+        "/usr/local/opt/openjdk@17",
+        "/usr/local/opt/openjdk@21",
+        "/usr/lib/jvm/default-java",
+    ])
+
+    # Glob search for JDK installations
+    glob_patterns = [
+        "/Library/Java/JavaVirtualMachines/*/Contents/Home",
+        os.path.expanduser("~/Library/Java/JavaVirtualMachines/*/Contents/Home"),
+        "/usr/lib/jvm/java-17*",
+        "/usr/lib/jvm/java-21*",
+        "/usr/lib/jvm/*-17*",
+        "/usr/lib/jvm/*-21*",
+        r"C:\Program Files\Java\jdk-17*",
+        r"C:\Program Files\Java\jdk-21*",
+        r"C:\Program Files\Eclipse Adoptium\jdk-17*",
+        r"C:\Program Files\Eclipse Adoptium\jdk-21*",
     ]
+    for pattern in glob_patterns:
+        candidates.extend(sorted(glob.glob(pattern), reverse=True))
+
+    # Evaluate candidates
+    found = []
     for c in candidates:
-        if c and os.path.isfile(os.path.join(c, "bin", "java")):
-            return os.path.join(c, "bin", "java"), os.path.join(c, "bin", "javac"), os.path.join(c, "bin", "keytool")
+        res = check_jdk(c)
+        if res and res not in found:
+            found.append(res)
+
+    # 4. Also check PATH
     java_in_path = shutil.which("java")
     javac_in_path = shutil.which("javac")
     keytool_in_path = shutil.which("keytool")
-    if java_in_path and keytool_in_path:
-        return java_in_path, (javac_in_path or "javac"), keytool_in_path
-    sys.exit("Error: Could not locate Java 17+ or keytool. Set JAVA_HOME.")
+    if java_in_path:
+        major = get_java_major_version(java_in_path)
+        found.append((java_in_path, (javac_in_path or "javac"), (keytool_in_path or "keytool"), major))
+
+    # Kotlin 2.0.x compiler officially supports running on JDK 17 through 21
+    compatible = [f for f in found if 17 <= f[3] <= 21]
+    if compatible:
+        return compatible[0][0], compatible[0][1], compatible[0][2]
+
+    # Fallback to any Java >= 17
+    fallback = [f for f in found if f[3] >= 17]
+    if fallback:
+        return fallback[0][0], fallback[0][1], fallback[0][2]
+
+    sys.exit("Error: Could not locate Java 17-21 or keytool. Please set JAVA_HOME or pass --java-home.")
+
+
+def find_tool(name, directory):
+    for ext in ["", ".exe", ".bat", ".cmd"]:
+        p = os.path.join(directory, name + ext)
+        if os.path.isfile(p):
+            return p
+    w = shutil.which(name)
+    if w:
+        return w
+    sys.exit(f"Error: Tool '{name}' not found in {directory} or in PATH.")
 
 
 def download_file(url, dest_path):
@@ -150,7 +279,7 @@ def resolve_artifact(grp, name, ver, ext, cache_dir):
     if os.path.exists(cached_file) and os.path.getsize(cached_file) > 0:
         return cached_file
 
-    # Check ~/.m2/repository
+    # Check ~/.m2/repository (if present)
     m2_path = os.path.join(
         os.path.expanduser("~/.m2/repository"),
         *grp.split("."),
@@ -162,25 +291,11 @@ def resolve_artifact(grp, name, ver, ext, cache_dir):
         shutil.copyfile(m2_path, cached_file)
         return cached_file
 
-    # Check ~/.gradle/caches
-    gradle_pattern = os.path.join(
-        os.path.expanduser("~/.gradle/caches/modules-2/files-2.1"),
-        grp,
-        name,
-        ver,
-        "**",
-        filename
-    )
-    gradle_matches = glob.glob(gradle_pattern, recursive=True)
-    if gradle_matches:
-        shutil.copyfile(gradle_matches[0], cached_file)
-        return cached_file
-
-    # Download from Google or Central
+    # Download from Maven Central or Google Maven
     grp_path = grp.replace(".", "/")
     urls = [
-        f"https://maven.google.com/{grp_path}/{name}/{ver}/{filename}",
         f"https://repo.maven.apache.org/maven2/{grp_path}/{name}/{ver}/{filename}",
+        f"https://maven.google.com/{grp_path}/{name}/{ver}/{filename}",
     ]
     for url in urls:
         if download_file(url, cached_file):
@@ -190,9 +305,13 @@ def resolve_artifact(grp, name, ver, ext, cache_dir):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Build mdtools fat APK")
-    parser.add_argument("--project-dir", default=os.path.abspath(os.path.dirname(__file__)))
-    parser.add_argument("--output-dir", default=None)
+    parser = argparse.ArgumentParser(description="Build mdtools fat APK (cross-platform & portable)")
+    parser.add_argument("--project-dir", default=os.path.abspath(os.path.dirname(__file__)), help="Project root directory")
+    parser.add_argument("--output-dir", default=None, help="Target build output directory")
+    parser.add_argument("--android-sdk", default=None, help="Path to Android SDK directory")
+    parser.add_argument("--java-home", default=None, help="Path to Java 17+ JDK home directory")
+    parser.add_argument("--build-tools", default=None, help="Build-tools version or specific folder")
+    parser.add_argument("--platform", default=None, help="Android platform (e.g. android-34, android-36)")
     parser.add_argument("--skip-tests", action="store_true", help="Skip running unit tests")
     args = parser.parse_args()
 
@@ -200,29 +319,56 @@ def main():
     target_dir = args.output_dir or os.path.join(project_dir, "target")
     os.makedirs(target_dir, exist_ok=True)
 
-    sdk_dir = find_android_sdk()
-    java_bin, javac_bin, keytool_bin = find_java()
+    sdk_dir = find_android_sdk(args.android_sdk)
+    java_bin, javac_bin, keytool_bin = find_java(args.java_home)
 
-    # Find build-tools
+    # Locate build-tools
     bt_dir = os.path.join(sdk_dir, "build-tools")
-    bt_versions = sorted(os.listdir(bt_dir), reverse=True)
-    if not bt_versions:
-        sys.exit("Error: No build-tools installed in Android SDK.")
-    build_tools = os.path.join(bt_dir, bt_versions[0])
+    if not os.path.isdir(bt_dir):
+        sys.exit(f"Error: No build-tools directory found in Android SDK at {sdk_dir}")
 
-    aapt2 = os.path.join(build_tools, "aapt2")
-    d8 = os.path.join(build_tools, "d8")
-    zipalign = os.path.join(build_tools, "zipalign")
-    apksigner = os.path.join(build_tools, "apksigner")
+    if args.build_tools:
+        if os.path.isdir(args.build_tools):
+            build_tools = os.path.abspath(args.build_tools)
+        else:
+            build_tools = os.path.join(bt_dir, args.build_tools)
+            if not os.path.isdir(build_tools):
+                sys.exit(f"Error: Specified build-tools '{args.build_tools}' not found in {bt_dir}")
+    else:
+        bt_versions = sorted(os.listdir(bt_dir), reverse=True)
+        if not bt_versions:
+            sys.exit("Error: No build-tools installed in Android SDK.")
+        build_tools = os.path.join(bt_dir, bt_versions[0])
 
-    # Find platforms
+    aapt2 = find_tool("aapt2", build_tools)
+    d8 = find_tool("d8", build_tools)
+    zipalign = find_tool("zipalign", build_tools)
+    apksigner = find_tool("apksigner", build_tools)
+
+    # Locate platforms
     plat_dir = os.path.join(sdk_dir, "platforms")
-    plat_versions = sorted([p for p in os.listdir(plat_dir) if p.startswith("android-")], reverse=True)
-    if not plat_versions:
-        sys.exit("Error: No platform installed in Android SDK.")
-    android_jar = os.path.join(plat_dir, plat_versions[0], "android.jar")
+    if not os.path.isdir(plat_dir):
+        sys.exit(f"Error: No platforms directory found in Android SDK at {sdk_dir}")
 
-    print(f"=== mdtools Android APK Build ===")
+    if args.platform:
+        plat_target = os.path.join(plat_dir, args.platform)
+        if not os.path.isdir(plat_target):
+            sys.exit(f"Error: Specified platform '{args.platform}' not found in {plat_dir}")
+        android_jar = os.path.join(plat_target, "android.jar")
+    else:
+        plat_versions = sorted([p for p in os.listdir(plat_dir) if p.startswith("android-")], reverse=True)
+        if not plat_versions:
+            sys.exit("Error: No platform installed in Android SDK.")
+        android_jar = os.path.join(plat_dir, plat_versions[0], "android.jar")
+
+    if not os.path.isfile(android_jar):
+        sys.exit(f"Error: android.jar not found at {android_jar}")
+
+    # Infer target SDK version from selected platform (e.g. android-36 -> 36)
+    plat_name = os.path.basename(os.path.dirname(android_jar))
+    target_sdk = plat_name.replace("android-", "") if plat_name.startswith("android-") else "36"
+
+    print("=== mdtools Android APK Build ===")
     print(f"Project directory: {project_dir}")
     print(f"Target directory:  {target_dir}")
     print(f"Build tools:       {build_tools}")
@@ -270,7 +416,7 @@ def main():
             if os.path.exists(res_zip):
                 compiled_res_zips.append(res_zip)
 
-    # Compile app res
+    # Compile app resources
     app_res_dir = os.path.join(project_dir, "app", "src", "main", "res")
     app_res_zip = os.path.join(compiled_res_dir, "app_res.zip")
     res = subprocess.run([aapt2, "compile", "--dir", app_res_dir, "-o", app_res_zip], capture_output=True, text=True)
@@ -291,7 +437,7 @@ def main():
         "-I", android_jar,
         "--manifest", manifest_file,
         "--min-sdk-version", "24",
-        "--target-sdk-version", "36",
+        "--target-sdk-version", target_sdk,
         "--version-code", "1",
         "--version-name", "1.0",
         "-A", assets_dir,
@@ -304,7 +450,6 @@ def main():
         link_cmd.extend(["-R", rz])
 
     # Collect library package names for R.java generation
-    import xml.etree.ElementTree as ET
     extra_packages = []
     for aar_manifest in glob.glob(os.path.join(unpacked_aars_dir, "*", "AndroidManifest.xml")):
         try:
@@ -332,16 +477,13 @@ def main():
     shutil.rmtree(classes_out, ignore_errors=True)
     os.makedirs(classes_out, exist_ok=True)
 
-    compile_classpath = ":".join([android_jar] + jars + aar_classes_jars)
+    compile_classpath = os.pathsep.join([android_jar] + jars + aar_classes_jars)
 
-    # Locate Kotlin compiler jars
-    kotlinc_jar = os.path.expanduser("~/.m2/repository/org/jetbrains/kotlin/kotlin-compiler/2.0.21/kotlin-compiler-2.0.21.jar")
-    if not os.path.exists(kotlinc_jar):
-        kotlinc_jar = resolve_artifact("org.jetbrains.kotlin", "kotlin-compiler", "2.0.21", "jar", cache_dir)
-
-    # All dependencies needed for kotlin compiler runner
-    m2_jars = glob.glob(os.path.expanduser("~/.m2/repository/**/*.jar"), recursive=True)
-    runner_cp = ":".join([kotlinc_jar] + m2_jars + jars)
+    # Resolve standalone Kotlin compiler runner classpath deterministically
+    kotlinc_runner_jars = []
+    for grp, name, ver, ext in KOTLIN_COMPILER_DEPS:
+        kotlinc_runner_jars.append(resolve_artifact(grp, name, ver, ext, cache_dir))
+    runner_cp = os.pathsep.join(kotlinc_runner_jars)
 
     compile_cmd = [
         java_bin,
@@ -362,7 +504,7 @@ def main():
         print(f"Compiling {len(r_java_files)} generated R.java files with javac...")
         javac_cmd = [
             javac_bin,
-            "-cp", compile_classpath + ":" + classes_out,
+            "-cp", compile_classpath + os.pathsep + classes_out,
             "-d", classes_out,
             "--release", "17"
         ] + r_java_files
@@ -382,7 +524,7 @@ def main():
             test_classes_out = os.path.join(target_dir, "test-classes")
             shutil.rmtree(test_classes_out, ignore_errors=True)
             os.makedirs(test_classes_out, exist_ok=True)
-            test_compile_cp = ":".join([classes_out, android_jar] + jars + aar_classes_jars + test_jars)
+            test_compile_cp = os.pathsep.join([classes_out, android_jar] + jars + aar_classes_jars + test_jars)
             test_compile_cmd = [
                 java_bin,
                 "-cp", runner_cp,
@@ -396,16 +538,28 @@ def main():
             if res.returncode != 0:
                 sys.exit(f"Test compilation failed: {res.stderr}\n{res.stdout}")
 
-            run_cp = ":".join([test_classes_out, classes_out, android_jar] + jars + aar_classes_jars + test_jars)
+            # Automatically discover test class names
+            test_classes = []
+            for tf in sorted(test_files):
+                pkg = None
+                with open(tf, "r", encoding="utf-8") as f:
+                    for line in f:
+                        line_str = line.strip()
+                        if line_str.startswith("package "):
+                            pkg = line_str.split()[1]
+                            break
+                cls_name = os.path.splitext(os.path.basename(tf))[0]
+                if pkg:
+                    test_classes.append(f"{pkg}.{cls_name}")
+                else:
+                    test_classes.append(cls_name)
+
+            run_cp = os.pathsep.join([test_classes_out, classes_out, android_jar] + jars + aar_classes_jars + test_jars)
             test_runner_cmd = [
                 java_bin,
                 "-cp", run_cp,
-                "org.junit.runner.JUnitCore",
-                "it.ilpelle.mdtools.ExampleUnitTest",
-                "it.ilpelle.mdtools.table.MarkdownTableTest",
-                "it.ilpelle.mdtools.table.MarkdownTableParserTest",
-                "it.ilpelle.mdtools.table.MarkdownTableFormatterTest"
-            ]
+                "org.junit.runner.JUnitCore"
+            ] + test_classes
             res = subprocess.run(test_runner_cmd, capture_output=True, text=True)
             print(res.stdout)
             if res.returncode != 0:
@@ -492,17 +646,11 @@ def main():
 
     shutil.copyfile(final_apk, versioned_apk)
 
-    # Also sync to app/build/outputs/apk/debug/app-debug.apk for backwards compatibility
-    gradle_debug_apk = os.path.join(project_dir, "app", "build", "outputs", "apk", "debug", "app-debug.apk")
-    os.makedirs(os.path.dirname(gradle_debug_apk), exist_ok=True)
-    shutil.copyfile(final_apk, gradle_debug_apk)
-
     apk_size_mb = os.path.getsize(final_apk) / (1024 * 1024)
     print("========================================")
     print(f"BUILD SUCCESS!")
     print(f"Fat APK created: {final_apk}")
     print(f"Versioned APK:   {versioned_apk}")
-    print(f"Debug APK alias: {gradle_debug_apk}")
     print(f"APK Size:        {apk_size_mb:.2f} MB")
     print(f"Package:         it.ilpelle.mdtools")
     print(f"Signing:         Verified (v1, v2, v3)")
